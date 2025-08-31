@@ -1,0 +1,32 @@
+{
+  "name": "synthra-shared",
+  "version": "1.0.0",
+  "description": "Shared schemas and types for Synthra",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "generate:python": "node scripts/generate-python-types.js",
+    "build:all": "npm run build && npm run generate:python"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./types": {
+      "import": "./dist/types.js",
+      "types": "./dist/types.d.ts"
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "@types/node": "^20.10.0"
+  },
+  "files": [
+    "dist",
+    "python"
+  ]
+}
