@@ -10,9 +10,7 @@ chrome.runtime.onInstalled.addListener(() => {
   // Initialize storage with default settings
   chrome.storage.sync.set({
     apiBaseUrl: API_BASE_URL,
-    autoSummarize: true,
-    notionEnabled: false,
-    highlightEnabled: true
+    notionEnabled: false
   });
 });
 
@@ -69,19 +67,23 @@ async function handleGetTabContent(message, sender, sendResponse) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     // Inject content script if not already injected
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      function: () => {
-        return {
-          title: document.title,
-          url: window.location.href,
-          content: document.body.innerText,
-          html: document.documentElement.outerHTML
-        };
-      }
-    });
-    
-    sendResponse({ success: true, data: results[0].result });
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        function: () => {
+          return {
+            title: document.title,
+            url: window.location.href,
+            content: document.body.innerText,
+            html: document.documentElement.outerHTML
+          };
+        }
+      });
+      
+      sendResponse({ success: true, data: results[0].result });
+    } catch (scriptError) {
+      sendResponse({ success: false, error: 'Cannot access content from this page' });
+    }
   } catch (error) {
     console.error('Error getting tab content:', error);
     sendResponse({ success: false, error: error.message });
@@ -153,16 +155,26 @@ async function handleMultiTabResearch(message, sendResponse) {
     for (const tabId of message.tabIds) {
       const tab = tabs.find(t => t.id === tabId);
       if (tab) {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          function: () => ({
-            title: document.title,
-            url: window.location.href,
-            content: document.body.innerText
-          })
-        });
-        tabContents.push(results[0].result);
+        try {
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            function: () => ({
+              title: document.title,
+              url: window.location.href,
+              content: document.body.innerText
+            })
+          });
+          tabContents.push(results[0].result);
+        } catch (scriptError) {
+          // Skip tabs that can't be accessed (chrome:// URLs, etc.)
+          continue;
+        }
       }
+    }
+    
+    if (tabContents.length === 0) {
+      sendResponse({ success: false, error: 'No accessible content found in the selected tabs' });
+      return;
     }
     
     const result = await makeAPICall('/multi-tab-research', {
@@ -214,58 +226,34 @@ async function handleTestEcho(message, sendResponse) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     // Get title from content script
-    const titleResponse = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      function: () => {
-        return {
-          title: document.title,
-          url: window.location.href
-        };
-      }
-    });
-    
-    const titleData = titleResponse[0].result;
-    
-    // Send to backend echo endpoint
-    const result = await makeAPICall('/echo', {
-      title: titleData.title,
-      url: titleData.url,
-      source: 'extension-test'
-    });
-    
-    sendResponse({ success: true, data: result });
+    try {
+      const titleResponse = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        function: () => {
+          return {
+            title: document.title,
+            url: window.location.href
+          };
+        }
+      });
+      
+      const titleData = titleResponse[0].result;
+      
+      // Send to backend echo endpoint
+      const result = await makeAPICall('/echo', {
+        title: titleData.title,
+        url: titleData.url,
+        source: 'extension-test'
+      });
+      
+      sendResponse({ success: true, data: result });
+    } catch (scriptError) {
+      sendResponse({ success: false, error: 'Cannot access content from this page' });
+    }
   } catch (error) {
     console.error('Echo test error:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
 
-// Tab change detection for auto-summarize
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  const settings = await chrome.storage.sync.get(['autoSummarize']);
-  if (settings.autoSummarize) {
-    // Notify sidebar about tab change
-    chrome.runtime.sendMessage({
-      type: 'TAB_CHANGED',
-      tabId: activeInfo.tabId
-    }).catch(() => {
-      // Sidebar might not be open, ignore error
-    });
-  }
-});
 
-// Listen for tab updates (URL changes)
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
-    const settings = await chrome.storage.sync.get(['autoSummarize']);
-    if (settings.autoSummarize) {
-      chrome.runtime.sendMessage({
-        type: 'TAB_UPDATED',
-        tabId: tabId,
-        url: tab.url
-      }).catch(() => {
-        // Sidebar might not be open, ignore error
-      });
-    }
-  }
-});
