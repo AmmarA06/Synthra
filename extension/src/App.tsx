@@ -1,28 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Brain, Settings, BookOpen, Lightbulb, Search, Save } from 'lucide-react';
-import { TabContent, Summary, Highlight, Research, NextStep } from '@shared/types';
+import { Brain, Settings, Lightbulb, Search, Save } from 'lucide-react';
+import { TabContent } from '@shared/types';
 import SummarySection from './components/SummarySection';
 import HighlightSection from './components/HighlightSection';
 import ResearchSection from './components/ResearchSection';
-import NextStepsSection from './components/NextStepsSection';
 import SettingsSection from './components/SettingsSection';
 import LoadingSpinner from './components/LoadingSpinner';
+import PageTransitionIndicator from './components/PageTransitionIndicator';
+import Toast from './components/Toast';
 import { useChrome } from './hooks/useChrome';
+import { useTabState } from './hooks/useTabState';
 import { api, ApiError } from './services/api';
 
-type ActiveTab = 'summary' | 'highlights' | 'research' | 'nextsteps' | 'settings';
+type ActiveTab = 'summary' | 'highlights' | 'research' | 'settings';
 
 function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('summary');
   const [currentTabContent, setCurrentTabContent] = useState<TabContent | null>(null);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
-  const [research, setResearch] = useState<Research | null>(null);
-  const [nextSteps, setNextSteps] = useState<NextStep[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const { sendMessage, getStorage } = useChrome();
+  const tabState = useTabState();
 
   // Load current tab content on mount
   useEffect(() => {
@@ -45,6 +45,13 @@ function App() {
     chrome.runtime.onMessage.addListener(handleMessage);
     return () => chrome.runtime.onMessage.removeListener(handleMessage);
   }, []);
+
+  // Also refresh content when user switches to highlights tab to ensure we have current content
+  useEffect(() => {
+    if (activeTab === 'highlights') {
+      loadCurrentTabContent();
+    }
+  }, [activeTab]);
 
   const loadApiSettings = async () => {
     try {
@@ -75,18 +82,27 @@ function App() {
   };
 
   const handleSummarize = async () => {
-    if (!currentTabContent) return;
-
     setIsLoading(true);
     setError(null);
 
     try {
+      // Fetch fresh content from current tab
+      const response = await sendMessage({ type: 'GET_TAB_CONTENT' });
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to get current page content');
+      }
+
+      const tabContent = response.data;
+      if (!tabContent.content) {
+        throw new Error('No content available to summarize');
+      }
+
       const summary = await api.summarize(
-        currentTabContent.content,
-        currentTabContent.title,
-        currentTabContent.url
+        tabContent.content,
+        tabContent.title,
+        tabContent.url
       );
-      setSummary(summary);
+      await tabState.saveSummary(summary);
     } catch (err) {
       const errorMessage = err instanceof ApiError ? err.message : 'Failed to summarize content';
       setError(errorMessage);
@@ -96,18 +112,33 @@ function App() {
   };
 
   const handleHighlight = async (text?: string) => {
-    if (!currentTabContent && !text) return;
-
     setIsLoading(true);
     setError(null);
 
     try {
+      let contentToHighlight = text;
+      
+      // If no specific text provided, fetch fresh content from current tab
+      if (!contentToHighlight) {
+        const response = await sendMessage({ type: 'GET_TAB_CONTENT' });
+        if (response.success) {
+          contentToHighlight = response.data.content;
+        } else {
+          throw new Error(response.error || 'Failed to get current page content');
+        }
+      }
+
+      if (!contentToHighlight) {
+        throw new Error('No content available to highlight');
+      }
+
       const newHighlights = await api.highlight(
-        text || currentTabContent?.content || '',
+        contentToHighlight,
         text ? 'selected' : 'full'
       );
       
-      setHighlights(prev => [...prev, ...newHighlights]);
+      const updatedHighlights = [...tabState.currentState.highlights, ...newHighlights];
+      await tabState.saveHighlights(updatedHighlights);
       
       // Send highlights to content script for display
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -130,17 +161,12 @@ function App() {
     setError(null);
 
     try {
-      console.log('Starting tab research with query:', query, 'and tab IDs:', tabIds);
-      
       // Get content from all specified tabs
       const tabs = await chrome.tabs.query({});
-      console.log('All available tabs:', tabs.map(t => ({ id: t.id, title: t.title, url: t.url })));
-      
       const tabContents: TabContent[] = [];
       
       for (const tabId of tabIds) {
         const tab = tabs.find(t => t.id === tabId);
-        console.log('Processing tab:', tab);
         
         if (tab) {
           try {
@@ -171,38 +197,29 @@ function App() {
                 };
               }
             });
-            console.log('Content extracted from tab:', results[0].result);
             
             if (results[0].result.error) {
-              console.error('Content extraction error:', results[0].result.error);
-              setError(`Failed to extract content from tab: ${results[0].result.error}`);
-              setIsLoading(false);
-              return;
+              // Skip tabs that can't be accessed (chrome:// URLs, etc.)
+              continue;
             }
             
             tabContents.push(results[0].result as TabContent);
           } catch (scriptError) {
-            console.error('Error extracting content from tab:', tabId, scriptError);
-            setError(`Failed to extract content from tab: ${tab.title || tab.url}`);
-            setIsLoading(false);
-            return;
+            // Skip tabs that can't be accessed
+            continue;
           }
         }
       }
       
-      console.log('All tab contents extracted:', tabContents);
-      
       if (tabContents.length === 0) {
-        setError('No content could be extracted from the selected tabs');
+        setError('No accessible content found in the selected tabs. Try selecting different tabs or check if the pages are fully loaded.');
         setIsLoading(false);
         return;
       }
       
       const research = await api.research(query, tabContents);
-      console.log('Research result:', research);
-      setResearch(research);
+      await tabState.saveResearch(research);
     } catch (err) {
-      console.error('Research error:', err);
       const errorMessage = err instanceof ApiError ? err.message : 'Failed to perform research';
       setError(errorMessage);
     } finally {
@@ -210,42 +227,34 @@ function App() {
     }
   };
 
-  const handleNextSteps = async (userGoal?: string) => {
-    if (!currentTabContent || !summary) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const steps = await api.suggestNextSteps(
-        currentTabContent.content,
-        summary,
-        userGoal
-      );
-      setNextSteps(steps);
-    } catch (err) {
-      const errorMessage = err instanceof ApiError ? err.message : 'Failed to suggest next steps';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSaveToNotion = async (content: any, type: string) => {
     setIsLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
-      const result = await api.notionSave(
-        content,
+      // ALWAYS fetch fresh content from current tab - don't trust cached state
+      // This ensures we save content from the actual current page, not a previous page
+      const response = await sendMessage({ type: 'GET_TAB_CONTENT' });
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to get current page content');
+      }
+
+      const tabContent = response.data;
+
+      // Use fresh content if type is 'content', otherwise use the passed content
+      // This prevents saving stale cached data when navigating between pages
+      const contentToSave = type === 'content' ? tabContent.content : content;
+
+      await api.notionSave(
+        contentToSave,
         type as 'summary' | 'highlight' | 'research' | 'content',
-        currentTabContent?.title,
-        currentTabContent?.url
+        tabContent?.title,
+        tabContent?.url
       );
-      
-      // Show success message
-      console.log('Saved to Notion successfully:', result);
-      // You could show a toast notification here instead of console.log
+
+      setSuccess('✓ Saved to Notion successfully!');
     } catch (err) {
       const errorMessage = err instanceof ApiError ? err.message : 'Failed to save to Notion';
       setError(errorMessage);
@@ -258,75 +267,90 @@ function App() {
     { id: 'summary', label: 'Summary', icon: Brain },
     { id: 'highlights', label: 'Highlights', icon: Lightbulb },
     { id: 'research', label: 'Research', icon: Search },
-    { id: 'nextsteps', label: 'Next Steps', icon: BookOpen },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-white border-b">
-        <div className="flex items-center space-x-2">
-          <Brain className="w-6 h-6 text-synthra-600" />
-          <h1 className="text-lg font-semibold text-gray-900">Synthra</h1>
+    <div className="flex flex-col h-screen bg-white m-0 p-0">
+      {/* Toast Notifications */}
+      {error && (
+        <Toast
+          message={error}
+          type="error"
+          onClose={() => setError(null)}
+        />
+      )}
+      {success && (
+        <Toast
+          message={success}
+          type="success"
+          onClose={() => setSuccess(null)}
+        />
+      )}
+
+      {/* Page Transition Indicator */}
+      <PageTransitionIndicator
+        isLoading={tabState.isLoading}
+        currentUrl={tabState.currentUrl}
+      />
+
+      {/* Custom Header - Takes full control of the top area */}
+      <div className="bg-gradient-to-r from-synthra-600 to-synthra-700 shadow-md">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
+              <Brain className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-lg font-bold text-white">Synthra</h1>
+          </div>
+          {currentTabContent && (
+            <button
+              onClick={() => handleSaveToNotion(null, 'content')}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-3 py-1.5 bg-white text-synthra-700 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              title="Save to Notion"
+            >
+              <Save className="w-4 h-4" />
+              <span>Save</span>
+            </button>
+          )}
         </div>
-        {currentTabContent && (
-          <button
-            onClick={() => handleSaveToNotion(summary || currentTabContent, 'content')}
-            className="p-2 text-gray-500 hover:text-synthra-600 transition-colors"
-            title="Save to Notion"
-          >
-            <Save className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex border-b bg-white">
+      <div className="flex bg-white border-b border-gray-200">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as ActiveTab)}
-              className={`flex-1 flex items-center justify-center space-x-1 py-3 px-2 text-xs font-medium transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 text-xs font-medium transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'text-synthra-600 border-b-2 border-synthra-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-synthra-600 border-b-2 border-synthra-600 bg-synthra-50/50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent'
               }`}
             >
               <Icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span>{tab.label}</span>
             </button>
           );
         })}
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-hidden">
-        {error && (
-          <div className="p-4 m-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800 text-sm">{error}</p>
-            <button
-              onClick={() => setError(null)}
-              className="mt-2 text-xs text-red-600 hover:text-red-800"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {isLoading && (
-          <div className="flex items-center justify-center p-8">
+      <div className="flex-1 overflow-hidden relative bg-gray-50">
+        {(isLoading || tabState.isLoading) && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10">
             <LoadingSpinner />
           </div>
         )}
 
-        <div className="h-full overflow-y-auto">
+        <div className="h-full overflow-y-auto bg-gray-50">
           {activeTab === 'summary' && (
             <SummarySection
               currentTab={currentTabContent}
-              summary={summary}
+              summary={tabState.currentState.summary}
               onSummarize={handleSummarize}
               isLoading={isLoading}
             />
@@ -334,25 +358,17 @@ function App() {
 
           {activeTab === 'highlights' && (
             <HighlightSection
-              highlights={highlights}
+              highlights={tabState.currentState.highlights}
               onHighlight={handleHighlight}
-              onClearHighlights={() => setHighlights([])}
+              onClearHighlights={() => tabState.saveHighlights([])}
               isLoading={isLoading}
             />
           )}
 
           {activeTab === 'research' && (
             <ResearchSection
-              research={research}
+              research={tabState.currentState.research}
               onResearch={handleResearch}
-              isLoading={isLoading}
-            />
-          )}
-
-          {activeTab === 'nextsteps' && (
-            <NextStepsSection
-              nextSteps={nextSteps}
-              onGenerateSteps={handleNextSteps}
               isLoading={isLoading}
             />
           )}
