@@ -49,18 +49,31 @@ export interface Research {
   timestamp?: number;
 }
 
-export interface NextStep {
+// Vector Search and Similarity types
+export interface VectorDocument {
+  id: number;
   title: string;
-  description: string;
-  type: 'read' | 'action' | 'research' | 'practice';
-  priority: 'low' | 'medium' | 'high';
-  estimatedTimeMinutes?: number;
-  resources: {
-    title: string;
-    url: string;
-    type: 'article' | 'video' | 'course' | 'documentation' | 'tool';
-  }[];
-  tags?: string[];
+  url: string;
+  content: string;
+  metadata: Record<string, any>;
+  addedAt: string;
+  similarityScore?: number;
+  rank?: number;
+}
+
+export interface SimilarContent {
+  title: string;
+  url: string;
+  content: string;
+  similarityScore: number;
+  rank: number;
+}
+
+export interface ContentCluster {
+  clusters: number[][];
+  labels: number[];
+  centroids: number[][];
+  nClusters: number;
 }
 
 // API Request/Response types
@@ -126,14 +139,63 @@ export interface UrlResearchResponse {
   error?: string;
 }
 
-export interface SuggestNextStepsRequest {
-  content: string;
-  summary: Summary;
-  userGoal?: string;
+// Vector Search API types
+export interface VectorSearchRequest {
+  query: string;
+  k?: number;
+  threshold?: number;
 }
 
-export interface SuggestNextStepsResponse {
-  steps: NextStep[];
+export interface VectorSearchResponse {
+  results: VectorDocument[];
+  success: boolean;
+  error?: string;
+}
+
+export interface AddDocumentsRequest {
+  documents: {
+    content: string;
+    title?: string;
+    url?: string;
+    metadata?: Record<string, any>;
+  }[];
+}
+
+export interface AddDocumentsResponse {
+  documentIds: number[];
+  success: boolean;
+  error?: string;
+}
+
+export interface FindSimilarContentRequest {
+  content: string;
+  tabContents: TabContent[];
+  k?: number;
+}
+
+export interface FindSimilarContentResponse {
+  similarContents: SimilarContent[];
+  success: boolean;
+  error?: string;
+}
+
+export interface ContentDiversityRequest {
+  contents: string[];
+}
+
+export interface ContentDiversityResponse {
+  diversityScore: number;
+  success: boolean;
+  error?: string;
+}
+
+export interface ClusterContentRequest {
+  contents: string[];
+  nClusters?: number;
+}
+
+export interface ClusterContentResponse {
+  clusters: ContentCluster;
   success: boolean;
   error?: string;
 }
@@ -155,6 +217,8 @@ export interface NotionSaveRequest {
   type: 'summary' | 'highlight' | 'research' | 'content';
   title?: string;
   url?: string;
+  notionToken?: string;
+  databaseId?: string;
 }
 
 export interface NotionSaveResponse {
@@ -196,9 +260,6 @@ export interface APIError {
 
 // Utility types
 export type HighlightImportance = Highlight['importance'];
-export type NextStepType = NextStep['type'];
-export type NextStepPriority = NextStep['priority'];
-export type ResourceType = NextStep['resources'][0]['type'];
 
 // Export everything as default for easier importing
 export default {
@@ -207,15 +268,12 @@ export default {
   Summary: {} as Summary,
   Highlight: {} as Highlight,
   Research: {} as Research,
-  NextStep: {} as NextStep,
   SummarizeRequest: {} as SummarizeRequest,
   SummarizeResponse: {} as SummarizeResponse,
   HighlightRequest: {} as HighlightRequest,
   HighlightResponse: {} as HighlightResponse,
   MultiTabResearchRequest: {} as MultiTabResearchRequest,
   MultiTabResearchResponse: {} as MultiTabResearchResponse,
-  SuggestNextStepsRequest: {} as SuggestNextStepsRequest,
-  SuggestNextStepsResponse: {} as SuggestNextStepsResponse,
   NotionAuthRequest: {} as NotionAuthRequest,
   NotionAuthResponse: {} as NotionAuthResponse,
   NotionSaveRequest: {} as NotionSaveRequest,
