@@ -7,9 +7,9 @@ AI-powered browser agent for summarizing, highlighting, research, and learning a
 - **Smart Summarization**: Get concise summaries of web pages with key points
 - **Intelligent Highlighting**: Automatically identify and explain key terms
 - **Multi-Tab Research**: Compare and analyze content across multiple tabs
-- **Learning Suggestions**: Get personalized next steps for continued learning
-- **Notion Integration**: Save summaries and highlights to your Notion workspace
-- **Sidebar Interface**: Clean, modern sidebar UI that doesn't interfere with browsing
+- **URL Research**: Enter multiple URLs for comparison and analysis
+- **Notion Integration**: Save summaries and content to your Notion workspace
+- **Sidebar Interface**: Clean, modern side panel UI with state management across tabs
 
 ## Development Setup
 
@@ -38,15 +38,15 @@ AI-powered browser agent for summarizing, highlighting, research, and learning a
 
 ```
 extension/
-├── public/           # Static assets and icons
 ├── src/             # React source code
-│   ├── components/  # UI components
-│   ├── hooks/       # Custom React hooks
+│   ├── components/  # UI components (ApiDemo, ResearchPanel, NotionIntegration, etc.)
+│   ├── hooks/       # Custom React hooks (useChrome, useTabState)
+│   ├── services/    # API service and Notion auth
 │   └── main.tsx     # Entry point
-├── background.js    # Service worker
-├── content.js       # Content script
+├── background.js    # Service worker (Manifest V3)
+├── content.js       # Content script for highlighting
 ├── manifest.json    # Extension manifest
-└── sidebar.html     # Sidebar entry point
+└── sidebar.html     # Side panel entry point
 ```
 
 ## Configuration
@@ -70,16 +70,15 @@ Default backend URL: `http://localhost:8000`
 - Shows contextual tooltips on hover
 
 ### Multi-Tab Research
-- Compare content across multiple tabs
+- Compare content across multiple open tabs
 - Generate comprehensive research reports
-- Find connections and differences
-- Cite sources automatically
+- Find connections and key differences between sources
 
-### Next Steps
-- Suggest relevant learning resources
-- Provide actionable next steps
-- Categorize by type (read, practice, research)
-- Include time estimates and difficulty levels
+### URL Research
+- Enter multiple URLs for direct comparison
+- Side-by-side analysis with pros/cons
+- Comprehensive comparison summary
+- Export results or save to Notion
 
 ## Permissions
 

@@ -8,10 +8,11 @@ While tools like Perplexity's Comet offer general web research, **Synthra focuse
 
 ### Features
 
-- Extracts clean educational content (no ads, navigation, or clutter)
-- AI-structures content into scannable study format
+- Extracts clean content using enhanced parsing (no ads or clutter)
+- AI-powered content summarization with key points
+- Smart term highlighting with explanations
+- Multi-tab and URL research for comparing sources
 - Formats perfectly for Notion (headings, bullets, code blocks)
-- Optimized for learning and quick review
 
 ### Perfect For
 
@@ -60,18 +61,19 @@ npm run build
 
 ## Usage
 
-1. Browse to any educational webpage
-2. Click Synthra icon in Chrome
-3. Click "Summarize" to process with AI
-4. Click "Save" to send to Notion
+1. Browse to any webpage
+2. Click Synthra icon in Chrome to open the side panel
+3. **Summarize**: Get AI-powered summary with key points
+4. **Highlight**: Identify and explain key terms on the page
+5. **Research**: Compare multiple tabs or URLs
+6. **Save to Notion**: Export summaries and content to your Notion workspace
 
-The extension automatically:
+### Notion Integration
 
-- Removes navigation, ads, and clutter
-- Extracts educational content
-- Structures with clear headings and sections
-- Formats code blocks with syntax highlighting
-- Creates scannable bullet points
+1. Click "Settings" in the extension
+2. Connect your Notion account
+3. Select a database to save to
+4. All summaries and research can be saved with one click
 
 ## Development
 

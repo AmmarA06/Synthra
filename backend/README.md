@@ -7,9 +7,9 @@ FastAPI backend for the Synthra AI browser agent.
 - **AI-powered content analysis** using Google Gemini models
 - **Content summarization** with key points and concepts
 - **Intelligent highlighting** of key terms and explanations
-- **Multi-tab research** across browser tabs
-- **Learning path suggestions** based on content
-- **Notion integration** for saving content
+- **Multi-tab research** comparing content across browser tabs
+- **URL research** for comparing multiple webpages
+- **Notion integration** for saving structured content
 
 ## Setup
 
@@ -51,12 +51,15 @@ DEBUG=True
 
 - `GET /` - Root endpoint
 - `GET /health` - Health check
-- `POST /summarize` - Summarize content
+- `POST /echo` - Test endpoint for extension communication
+- `POST /summarize` - Summarize content with enhanced parsing
 - `POST /highlight` - Highlight key terms
 - `POST /multi-tab-research` - Research across tabs
-- `POST /suggest-next-steps` - Suggest learning steps
-- `POST /notion/auth` - Notion authentication
-- `POST /notion/save` - Save to Notion
+- `POST /multi-tab-research-enhanced` - Enhanced research with vector similarity
+- `POST /url-research` - Fetch and compare multiple URLs
+- `POST /notion/test-connection` - Test Notion API connection
+- `POST /notion/databases` - Get available Notion databases
+- `POST /notion/save` - Save content to Notion
 
 ## Development
 
