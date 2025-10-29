@@ -8,15 +8,12 @@ import {
   Summary,
   Highlight,
   Research,
-  NextStep,
   SummarizeRequest,
   SummarizeResponse,
   HighlightRequest,
   HighlightResponse,
   MultiTabResearchRequest,
   MultiTabResearchResponse,
-  SuggestNextStepsRequest,
-  SuggestNextStepsResponse,
   NotionSaveRequest,
   NotionSaveResponse,
   UrlResearchRequest,
@@ -32,7 +29,7 @@ interface ApiConfig {
 // Default configuration
 const DEFAULT_CONFIG: ApiConfig = {
   baseUrl: 'http://localhost:8000',
-  timeout: 30000 // 30 seconds
+  timeout: 45000 // 30 seconds
 };
 
 // API Error class
@@ -187,26 +184,19 @@ export class ApiService {
   }
 
   /**
-   * Suggest next learning steps
+   * Test Notion connection
    */
-  async suggestNextSteps(
-    content: string, 
-    summary: Summary, 
-    userGoal?: string
-  ): Promise<NextStep[]> {
-    const request: SuggestNextStepsRequest = {
-      content,
-      summary,
-      userGoal
-    };
+  async testNotionConnection(token: string): Promise<{ success: boolean; error?: string; workspace?: string; user_id?: string; user_email?: string }> {
+    const response = await this.makeRequest('/notion/test-connection', { notion_token: token });
+    return response as { success: boolean; error?: string; workspace?: string; user_id?: string; user_email?: string };
+  }
 
-    const response = await this.makeRequest<SuggestNextStepsResponse>('/suggest-next-steps', request);
-    
-    if (!response.success) {
-      throw new ApiError(response.error || 'Next steps suggestion failed');
-    }
-
-    return response.steps;
+  /**
+   * Get Notion databases
+   */
+  async getNotionDatabases(token: string): Promise<{ success: boolean; databases: any[]; error?: string }> {
+    const response = await this.makeRequest('/notion/databases', { notion_token: token });
+    return response as { success: boolean; databases: any[]; error?: string };
   }
 
   /**
@@ -218,12 +208,36 @@ export class ApiService {
     title?: string,
     url?: string
   ): Promise<{ pageId?: string; pageUrl?: string }> {
+    // Get Notion token and database ID from storage
+    const notionAuth = await chrome.storage.sync.get(['notionAuth', 'selectedDatabaseId']);
+    const authState = notionAuth.notionAuth;
+    const databaseId = notionAuth.selectedDatabaseId;
+
+    if (!authState?.isAuthenticated || !authState.accessToken) {
+      throw new ApiError('Not authenticated with Notion');
+    }
+
+    if (!databaseId) {
+      throw new ApiError('No database selected');
+    }
+
     const request: NotionSaveRequest = {
       content,
       type,
       title,
-      url
+      url,
+      notionToken: authState.accessToken,
+      databaseId: databaseId
     };
+
+    console.log('Sending Notion save request:', {
+      type,
+      title,
+      url,
+      hasToken: !!authState.accessToken,
+      hasDatabaseId: !!databaseId,
+      tokenLength: authState.accessToken?.length
+    });
 
     const response = await this.makeRequest<NotionSaveResponse>('/notion/save', request);
     
@@ -283,14 +297,17 @@ export const api = {
   },
 
   /**
-   * Suggest next learning steps
+   * Test Notion connection
    */
-  suggestNextSteps: async (
-    text: string, 
-    summary: Summary, 
-    userGoal?: string
-  ): Promise<NextStep[]> => {
-    return apiService.suggestNextSteps(text, summary, userGoal);
+  testNotionConnection: async (token: string): Promise<{ success: boolean; error?: string; user?: string; workspace?: string }> => {
+    return apiService.testNotionConnection(token);
+  },
+
+  /**
+   * Get Notion databases
+   */
+  getNotionDatabases: async (token: string): Promise<{ success: boolean; databases: any[]; error?: string }> => {
+    return apiService.getNotionDatabases(token);
   },
 
   /**
@@ -340,8 +357,7 @@ export type {
   TabContent,
   Summary,
   Highlight,
-  Research,
-  NextStep
+  Research
 };
 
 export default api;
