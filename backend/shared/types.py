@@ -24,6 +24,7 @@ class Summary:
     timestamp: Optional[int] = None
     url: Optional[str] = None
     title: Optional[str] = None
+    images: Optional[List[Dict[str, str]]] = None
 
 @dataclass
 class HighlightPosition:
@@ -60,22 +61,6 @@ class Research:
     comparisons: List[ResearchComparison]
     sources: List[ResearchSource]
     timestamp: Optional[int] = None
-
-@dataclass
-class NextStepResource:
-    title: str
-    url: str
-    type: str  # 'article' | 'video' | 'course' | 'documentation' | 'tool'
-
-@dataclass
-class NextStep:
-    title: str
-    description: str
-    type: str  # 'read' | 'action' | 'research' | 'practice'
-    priority: str  # 'low' | 'medium' | 'high'
-    estimated_time_minutes: Optional[int] = None
-    resources: List[NextStepResource] = field(default_factory=list)
-    tags: Optional[List[str]] = None
 
 # Request/Response types for API
 @dataclass
@@ -135,15 +120,86 @@ class UrlResearchResponse:
     success: bool
     error: Optional[str] = None
 
+# Vector Search and Similarity types
 @dataclass
-class SuggestNextStepsRequest:
+class VectorDocument:
+    id: int
+    title: str
+    url: str
     content: str
-    summary: Summary
-    user_goal: Optional[str] = None
+    metadata: Dict[str, Any]
+    added_at: str
+    similarity_score: Optional[float] = None
+    rank: Optional[int] = None
 
 @dataclass
-class SuggestNextStepsResponse:
-    steps: List[NextStep]
+class SimilarContent:
+    title: str
+    url: str
+    content: str
+    similarity_score: float
+    rank: int
+
+@dataclass
+class ContentCluster:
+    clusters: List[List[int]]
+    labels: List[int]
+    centroids: List[List[float]]
+    n_clusters: int
+
+# Vector Search API types
+@dataclass
+class VectorSearchRequest:
+    query: str
+    k: Optional[int] = None
+    threshold: Optional[float] = None
+
+@dataclass
+class VectorSearchResponse:
+    results: List[VectorDocument]
+    success: bool
+    error: Optional[str] = None
+
+@dataclass
+class AddDocumentsRequest:
+    documents: List[Dict[str, Any]]
+
+@dataclass
+class AddDocumentsResponse:
+    document_ids: List[int]
+    success: bool
+    error: Optional[str] = None
+
+@dataclass
+class FindSimilarContentRequest:
+    content: str
+    tab_contents: List[TabContent]
+    k: Optional[int] = None
+
+@dataclass
+class FindSimilarContentResponse:
+    similar_contents: List[SimilarContent]
+    success: bool
+    error: Optional[str] = None
+
+@dataclass
+class ContentDiversityRequest:
+    contents: List[str]
+
+@dataclass
+class ContentDiversityResponse:
+    diversity_score: float
+    success: bool
+    error: Optional[str] = None
+
+@dataclass
+class ClusterContentRequest:
+    contents: List[str]
+    n_clusters: Optional[int] = None
+
+@dataclass
+class ClusterContentResponse:
+    clusters: ContentCluster
     success: bool
     error: Optional[str] = None
 
@@ -165,6 +221,8 @@ class NotionSaveRequest:
     type: str  # 'summary' | 'highlight' | 'research' | 'content'
     title: Optional[str] = None
     url: Optional[str] = None
+    notion_token: Optional[str] = None
+    database_id: Optional[str] = None
 
 @dataclass
 class NotionSaveResponse:
