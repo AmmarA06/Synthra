@@ -12,8 +12,8 @@ from datetime import datetime
 import google.generativeai as genai
 
 from shared.types import (
-    TabContent, Summary, Highlight, Research, NextStep,
-    ResearchComparison, ResearchSource, NextStepResource
+    TabContent, Summary, Highlight, Research,
+    ResearchComparison, ResearchSource
 )
 
 logger = logging.getLogger(__name__)
@@ -21,63 +21,108 @@ logger = logging.getLogger(__name__)
 class AIService:
     """Service for AI operations using Google Gemini"""
     
-    def __init__(self, api_key: str, model: str = None):
+    def __init__(self, api_key: str, model: str = None, vector_service=None):
         genai.configure(api_key=api_key)
-        self.model_name = model or os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
+        self.model_name = model or os.getenv('GEMINI_MODEL', 'gemini-flash-latest')
         self.model = genai.GenerativeModel(self.model_name)
+        self.vector_service = vector_service
         logger.info(f"AI Service initialized with model: {self.model_name}")
     
     async def summarize_content(self, content: str, title: str, url: str) -> Summary:
-        """Generate a summary of web page content"""
+        """Generate a summary of web page content with enhanced parsing and vector context"""
+        
+        # Get enhanced content if web scraper used enhanced parsing
+        enhanced_context = ""
+        similar_content_context = ""
+        
+        # If vector service is available, find similar content for context
+        if self.vector_service:
+            try:
+                # Search for similar content to provide context
+                similar_results = await self.vector_service.search_similar(
+                    query=f"{title} {content[:500]}",  # Use title + content start as query
+                    k=3,
+                    threshold=0.3
+                )
+                
+                if similar_results:
+                    similar_titles = [doc['title'] for doc in similar_results if doc.get('title')]
+                    if similar_titles:
+                        similar_content_context = f"\n\nRELATED CONTENT CONTEXT:\nSimilar topics you've researched: {', '.join(similar_titles[:3])}\nConsider connections and build upon previous knowledge."
+                
+            except Exception as e:
+                logger.warning(f"Could not get vector context for summary: {e}")
         
         prompt = f"""
-        You are an expert content analyst and summarization specialist. Analyze the following web page content and create a concise, actionable summary.
+        You are an expert content analyst and summarization specialist with access to your research history. Analyze the following web page content and create a concise, actionable summary that builds upon your existing knowledge.
 
         CONTENT TO ANALYZE:
         Title: {title}
         URL: {url}
-        Content: {content[:8000]}
+        Content: {content[:8000]}{similar_content_context}
 
-        ANALYSIS REQUIREMENTS:
-        1. MAIN SUMMARY (1-2 sentences):
-           - Capture the core message and purpose
-           - Identify the target audience
-           - Highlight the most valuable insight
+        STUDY NOTES REQUIREMENTS:
+        Create clean, scannable study notes optimized for Notion pages.
 
-        2. KEY POINTS (3-4 actionable points):
-           - Focus on practical, actionable information
-           - Include specific details, numbers, or examples where available
-           - Prioritize information that would be useful for decision-making
+        FORMATTING RULES FOR NOTION:
+        - Write concise, direct content - NO fluff or unnecessary words
+        - Use precise technical terminology
+        - Include actual examples and code from the source
+        - Make content easy to scan and review
 
-        3. KEY CONCEPTS (3-5 terms):
-           - Include technical terms, methodologies, tools, or frameworks mentioned
-           - Add proper nouns, company names, or specific technologies
-           - Include domain-specific terminology that's important to understand
+        1. SUMMARY (2-3 sentences max):
+           One clear paragraph explaining:
+           - What this content teaches
+           - Why it matters for learning
+           - How it connects to broader topics
 
-        4. READING TIME:
-           - Estimate based on average reading speed of 200-250 words per minute
-           - Round to nearest minute
+        2. KEY POINTS (4-6 points):
+           Each point should be 1-2 sentences covering:
+           - One specific concept or technique
+           - A concrete example or use case
+           - Why it's important (when applicable)
 
-        QUALITY GUIDELINES:
-        - Write in clear, professional language
-        - Be specific rather than generic
-        - Include quantitative information when available
-        - Make each point distinct and valuable
+           IMPORTANT FORMATTING:
+           - Use nested bullets for sub-points (indent with 2 spaces)
+           - Main point at top level, details/examples nested underneath
+           - Format as short, scannable bullets - NOT long paragraphs
+           - Include code snippets, formulas, or data when relevant
+
+           Example format:
+           "Main concept or technique
+             - Specific detail or example
+             - Another detail or use case"
+
+        3. KEY CONCEPTS (4-6 terms):
+           "TermName: One sentence definition and significance"
+
+           Focus on:
+           - Technical terms that need explanation
+           - Algorithms, data structures, patterns
+           - Tools, frameworks, methodologies
+
+           Keep definitions under 20 words - clear and concise.
+
+        QUALITY OVER QUANTITY:
+        - Extract real examples and code from content
+        - Include numbers, measurements, benchmarks
+        - Be specific, not generic
+        - Make it practical for implementation
 
         Format as JSON:
         {{
-            "summary": "Concise 1-2 sentence summary that captures core value and purpose",
+            "summary": "Comprehensive explanation of what this content teaches and its learning value",
             "keyPoints": [
-                "Specific actionable point with concrete details",
-                "Another valuable insight with context or examples",
-                "Practical information that aids decision-making"
+                "Detailed explanation of first key concept with examples and context",
+                "Step-by-step breakdown of important process or methodology",
+                "Practical application with specific examples or use cases",
+                "Technical details, code snippets, or formulas if relevant"
             ],
             "keyConcepts": [
-                "Technical Term",
-                "Methodology Name", 
-                "Company/Product Name"
-            ],
-            "readingTimeMinutes": 5
+                "Technical Term: Clear definition and significance",
+                "Algorithm Name: What it does and when to use it",
+                "Methodology: How it works and its applications"
+            ]
         }}
 
         Return only valid JSON, no additional text or formatting.
@@ -100,7 +145,7 @@ class AIService:
                 summary=result.get('summary', ''),
                 key_points=result.get('keyPoints', []),
                 key_concepts=result.get('keyConcepts', []),
-                reading_time_minutes=result.get('readingTimeMinutes'),
+                reading_time_minutes=None,  # Not needed for study notes
                 timestamp=int(datetime.now().timestamp() * 1000),
                 url=url,
                 title=title
@@ -110,15 +155,44 @@ class AIService:
             logger.error(f"Error in summarize_content: {str(e)}")
             raise
     
-    async def highlight_terms(self, content: str, context: Optional[str] = None) -> List[Highlight]:
-        """Identify and explain key terms in content"""
+    async def highlight_terms(self, content: str, context: Optional[str] = None, url: str = None) -> List[Highlight]:
+        """Identify and explain key terms in content with vector-enhanced context"""
         
         context_text = f"Context: {context}" if context else ""
+        vector_context = ""
+        
+        # If vector service is available, get related terms context
+        if self.vector_service and url:
+            try:
+                # Search for similar content to understand domain context
+                similar_results = await self.vector_service.search_similar(
+                    query=content[:300],  # Use beginning of content as query
+                    k=2,
+                    threshold=0.4
+                )
+                
+                if similar_results:
+                    related_domains = set()
+                    for doc in similar_results:
+                        if doc.get('metadata', {}).get('type'):
+                            related_domains.add(doc['metadata']['type'])
+                        # Extract domain from title/content
+                        title = doc.get('title', '').lower()
+                        if any(tech in title for tech in ['ai', 'machine learning', 'python', 'javascript', 'react']):
+                            related_domains.add('technology')
+                        elif any(biz in title for biz in ['business', 'marketing', 'finance']):
+                            related_domains.add('business')
+                    
+                    if related_domains:
+                        vector_context = f"\n\nDOMAIN CONTEXT: This content appears to be related to: {', '.join(related_domains)}. Prioritize terms relevant to these domains."
+                        
+            except Exception as e:
+                logger.warning(f"Could not get vector context for highlights: {e}")
         
         prompt = f"""
-        You are an expert educator and domain specialist. Analyze the content and identify key terms that would help someone better understand the material. Think like a teacher explaining complex concepts to students.
+        You are an expert educator and domain specialist with knowledge of the user's research history. Analyze the content and identify key terms that would help someone better understand the material. Think like a teacher explaining complex concepts to students.
 
-        {context_text}
+        {context_text}{vector_context}
 
         CONTENT TO ANALYZE:
         {content[:6000]}
@@ -324,151 +398,161 @@ class AIService:
             logger.error(f"Error in multi_tab_research: {str(e)}")
             raise
     
-    async def suggest_next_steps(
-        self, 
-        content: str, 
-        summary: Summary, 
-        user_goal: Optional[str] = None
-    ) -> List[NextStep]:
-        """Suggest next learning steps based on content and user goals"""
+    async def enhanced_multi_tab_research(self, tabs: List[TabContent], query: str) -> Research:
+        """Enhanced multi-tab research using vector similarity"""
         
-        goal_text = f"User's learning goal: {user_goal}" if user_goal else "General learning progression"
-        
-        prompt = f"""
-        You are an expert learning advisor and curriculum designer. Create a personalized learning path that builds upon the current content and guides the user toward their goals.
-
-        LEARNING CONTEXT:
-        {goal_text}
-        
-        CURRENT KNOWLEDGE BASE:
-        Content Summary: {summary.summary}
-        Key Concepts Covered: {', '.join(summary.key_concepts)}
-        
-        SOURCE CONTENT:
-        {content[:4000]}
-
-        LEARNING PATH REQUIREMENTS:
-
-        Create 3-4 progressive learning steps that:
-
-        1. LOGICAL PROGRESSION:
-           - Build systematically on current knowledge
-           - Progress from foundational to advanced concepts
-           - Fill critical knowledge gaps identified in the content
-           - Connect to the user's stated learning goal
-
-        2. DIVERSE LEARNING APPROACHES:
-           - Mix different types: read (theory), practice (hands-on), research (exploration), action (implementation)
-           - Balance passive learning with active application
-           - Include both structured and exploratory activities
-
-        3. PRACTICAL APPLICATION:
-           - Include real-world projects or exercises
-           - Suggest specific tools, platforms, or environments to use
-           - Provide concrete deliverables or outcomes
-
-        4. RESOURCE QUALITY:
-           - Suggest 2-3 high-quality, specific resources per step
-           - Include diverse resource types: articles, videos, courses, documentation, tools
-           - Prioritize authoritative, up-to-date sources
-
-        5. TIME MANAGEMENT:
-           - Estimate realistic time commitments (15min-2hours per step)
-           - Consider the complexity and scope of each activity
-
-        STEP PRIORITIZATION:
-        - "high" = Essential for achieving the learning goal, builds critical foundation
-        - "medium" = Important for well-rounded understanding, enhances competency  
-        - "low" = Valuable enrichment, provides additional context or advanced skills
-
-        Format as JSON:
-        {{
-            "steps": [
-                {{
-                    "title": "Master React Hooks Fundamentals",
-                    "description": "Deep dive into useState and useEffect to build a solid foundation for modern React development. Complete hands-on exercises building interactive components.",
-                    "type": "practice",
-                    "priority": "high",
-                    "estimatedTimeMinutes": 90,
-                    "resources": [
-                        {{
-                            "title": "React Hooks Documentation",
-                            "url": "https://react.dev/reference/react",
-                            "type": "documentation"
-                        }},
-                        {{
-                            "title": "Building Interactive React Components",
-                            "url": "https://react.dev/learn/adding-interactivity",
-                            "type": "tutorial"
-                        }}
-                    ],
-                    "tags": ["react", "hooks", "fundamentals", "hands-on"]
-                }},
-                {{
-                    "title": "Build a Todo App with React",
-                    "description": "Apply your React knowledge by building a full-featured todo application. Implement CRUD operations and component composition.",
-                    "type": "action",
-                    "priority": "high", 
-                    "estimatedTimeMinutes": 120,
-                    "resources": [
-                        {{
-                            "title": "React Todo App Tutorial",
-                            "url": "https://react.dev/learn/tutorial-tic-tac-toe",
-                            "type": "tutorial"
-                        }},
-                        {{
-                            "title": "Create React App Getting Started",
-                            "url": "https://create-react-app.dev/docs/getting-started",
-                            "type": "documentation"
-                        }}
-                    ],
-                    "tags": ["project", "portfolio", "crud", "practice"]
-                }}
-            ]
-        }}
-
-        Return only valid JSON, no additional text or formatting.
-        """
+        if self.vector_service is None:
+            # Fall back to regular multi-tab research if vector service not available
+            return await self.multi_tab_research(tabs, query)
         
         try:
+            # Find similar content across tabs using vector search
+            if len(tabs) > 1:
+                # Use the first tab as reference and find similar content in others
+                similar_results = await self.vector_service.find_similar_content(
+                    content=tabs[0].content,
+                    tab_contents=tabs[1:],
+                    k=min(3, len(tabs) - 1)
+                )
+                
+                # Calculate content diversity
+                all_contents = [tab.content for tab in tabs]
+                diversity_score = await self.vector_service.get_content_diversity_score(all_contents)
+                
+                # Add diversity information to the research context
+                diversity_context = f"\nContent Diversity Score: {diversity_score:.2f} (0=identical, 1=completely different)"
+                if diversity_score < 0.3:
+                    diversity_context += "\nNote: Sources appear to be very similar in content."
+                elif diversity_score > 0.7:
+                    diversity_context += "\nNote: Sources provide diverse perspectives on the topic."
+            else:
+                similar_results = []
+                diversity_context = ""
+            
+            # Prepare enhanced tab contents with similarity scores
+            tab_contents = []
+            for i, tab in enumerate(tabs):
+                similarity_info = ""
+                if i > 0 and similar_results:
+                    # Find similarity score for this tab
+                    for result in similar_results:
+                        if result['url'] == tab.url:
+                            similarity_info = f" (Similarity to main source: {result['similarity_score']:.2f})"
+                            break
+                
+                tab_contents.append(f"""
+                Tab {i + 1}: {tab.title}{similarity_info}
+                URL: {tab.url}
+                Content: {tab.content[:3000]}
+                """)
+            
+            combined_content = "\n\n".join(tab_contents)
+            
+            prompt = f"""
+            You are an expert research analyst conducting multi-source analysis with advanced similarity detection. Your goal is to synthesize information from multiple sources to provide actionable insights.
+
+            RESEARCH QUERY: {query}
+
+            SOURCES TO ANALYZE:
+            {combined_content}
+
+            {diversity_context}
+
+            ENHANCED ANALYSIS REQUIREMENTS:
+
+            1. SUMMARY (1-2 sentences):
+               - Directly address the research query with a clear answer
+               - Highlight the most important discovery or conclusion
+               - Consider source diversity in your analysis
+
+            2. KEY FINDINGS (3-4 evidence-based insights):
+               - Present specific, actionable discoveries
+               - Include supporting evidence or data points from sources
+               - Note any patterns revealed by similarity analysis
+               - Highlight unique insights that emerge from combining sources
+
+            3. SOURCE COMPARISONS (2-3 comparative analyses):
+               - Compare how sources approach the topic differently
+               - Identify areas of agreement and disagreement
+               - Use similarity scores to explain content relationships
+               - Note if high similarity affects the reliability of conclusions
+
+            4. SOURCE EVALUATION:
+               - Rate each source's relevance to the query (0.0-1.0)
+               - Consider similarity scores in your evaluation
+               - Account for content diversity in determining source value
+
+            ENHANCED RESEARCH QUALITY STANDARDS:
+            - Leverage similarity analysis to identify redundant information
+            - Use diversity scores to assess the breadth of perspectives
+            - Highlight when similar sources reinforce findings vs. when diverse sources provide broader insights
+            - Be transparent about limitations when sources are too similar
+
+            Format as JSON:
+            {{
+                "query": "{query}",
+                "summary": "Clear, direct answer addressing the research query",
+                "keyFindings": [
+                    "Evidence-based insight with source support",
+                    "Another key discovery with data points",
+                    "Third insight considering source relationships"
+                ],
+                "comparisons": [
+                    {{
+                        "aspect": "Comparative dimension",
+                        "details": "How sources differ/agree on this aspect"
+                    }}
+                ],
+                "sources": [
+                    {{
+                        "title": "Source title",
+                        "url": "Source URL", 
+                        "relevance": 0.85
+                    }}
+                ]
+            }}
+            """
+            
             response = self.model.generate_content(prompt)
             
-            # Clean the response text to extract JSON
-            response_text = response.text.strip()
-            if response_text.startswith('```json'):
-                response_text = response_text[7:]
-            if response_text.endswith('```'):
-                response_text = response_text[:-3]
-            response_text = response_text.strip()
-            
-            result = json.loads(response_text)
-            steps = []
-            
-            for step_data in result.get('steps', []):
-                # Convert resources
-                resources = []
-                for res in step_data.get('resources', []):
-                    resources.append(NextStepResource(
-                        title=res.get('title', ''),
-                        url=res.get('url', ''),
-                        type=res.get('type', 'article')
-                    ))
+            # Parse the JSON response
+            try:
+                import json
+                research_data = json.loads(response.text.strip())
                 
-                steps.append(NextStep(
-                    title=step_data.get('title', ''),
-                    description=step_data.get('description', ''),
-                    type=step_data.get('type', 'read'),
-                    priority=step_data.get('priority', 'medium'),
-                    estimated_time_minutes=step_data.get('estimatedTimeMinutes'),
-                    resources=resources,
-                    tags=step_data.get('tags', [])
-                ))
-            
-            return steps
-            
+                # Convert to Research object with proper structure
+                comparisons = [
+                    ResearchComparison(
+                        aspect=comp['aspect'],
+                        details=comp['details']
+                    ) for comp in research_data.get('comparisons', [])
+                ]
+                
+                sources = [
+                    ResearchSource(
+                        title=source['title'],
+                        url=source['url'],
+                        relevance=source.get('relevance', 0.5)
+                    ) for source in research_data.get('sources', [])
+                ]
+                
+                return Research(
+                    query=research_data.get('query', query),
+                    summary=research_data.get('summary', 'Unable to generate summary'),
+                    key_findings=research_data.get('keyFindings', []),
+                    comparisons=comparisons,
+                    sources=sources,
+                    timestamp=int(datetime.now().timestamp() * 1000)
+                )
+                
+            except json.JSONDecodeError:
+                logger.warning("Failed to parse JSON response, falling back to regular research")
+                return await self.multi_tab_research(tabs, query)
+                
         except Exception as e:
-            logger.error(f"Error in suggest_next_steps: {str(e)}")
-            raise
+            logger.error(f"Error in enhanced_multi_tab_research: {str(e)}")
+            # Fall back to regular research on error
+            return await self.multi_tab_research(tabs, query)
     
     async def analyze_page_for_comparison(self, title: str, content: str, url: str, context: str = "") -> Dict[str, any]:
         """Analyze a single page for multi-page comparison"""
