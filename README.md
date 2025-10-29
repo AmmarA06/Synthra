@@ -1,10 +1,6 @@
-# Synthra — AI-Powered Notion Study Notes
+# Synthra
 
 Turn any webpage into beautiful, study-ready Notion pages with one click.
-
-## Why Synthra?
-
-While tools like Perplexity's Comet offer general web research, **Synthra focuses exclusively on creating perfect study notes in Notion**.
 
 ### Features
 
