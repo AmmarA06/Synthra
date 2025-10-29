@@ -47,7 +47,7 @@ const ApiDemo: React.FC = () => {
           timestamp: Date.now()
         }
       ];
-      
+
       const research = await api.research("Compare React and Vue.js", tabs);
       console.log('Research result:', research);
       alert(`✅ Research successful!\nSummary: ${research.summary}\nFindings: ${research.keyFindings.length}`);
@@ -57,42 +57,36 @@ const ApiDemo: React.FC = () => {
     }
   };
 
-  const demoNextSteps = async () => {
-    try {
-      const mockSummary = {
-        summary: "Introduction to React concepts",
-        keyPoints: ["Components", "Props", "State"],
-        keyConcepts: ["React", "JavaScript", "UI"],
-        readingTimeMinutes: 5,
-        timestamp: Date.now()
-      };
-      
-      const steps = await api.suggestNextSteps(
-        "React tutorial content",
-        mockSummary,
-        "Learn React development"
-      );
-      console.log('Next steps result:', steps);
-      alert(`✅ Next Steps successful!\nSuggested ${steps.length} learning steps`);
-    } catch (error) {
-      console.error('Next steps error:', error);
-      alert(`❌ Next Steps failed: ${error instanceof ApiError ? error.message : String(error)}`);
-    }
-  };
-
   const demoNotionSave = async () => {
     try {
+      // Check if Notion is connected first
+      const notionAuth = await chrome.storage.sync.get(['notionAuth', 'selectedDatabaseId']);
+      if (!notionAuth.notionAuth?.isAuthenticated) {
+        alert('❌ Notion not connected. Please connect to Notion first in the Settings tab.');
+        return;
+      }
+      
+      if (!notionAuth.selectedDatabaseId) {
+        alert('❌ No database selected. Please select a database in the Settings tab.');
+        return;
+      }
+
       const result = await api.notionSave(
-        { title: "Test Summary", content: "This is a test summary" },
+        { 
+          summary: "This is a test summary from Synthra",
+          keyPoints: ["Test point 1", "Test point 2"],
+          keyConcepts: ["Testing", "Notion Integration"]
+        },
         "summary",
-        "Test Page",
-        "https://example.com"
+        "Synthra Test Summary",
+        "https://example.com/test"
       );
       console.log('Notion save result:', result);
-      alert(`✅ Notion Save successful!\nPage ID: ${result.pageId || 'N/A'}`);
+      alert(`✅ Notion Save successful!\nPage ID: ${result.pageId || 'N/A'}\nYou can view it in your Notion database.`);
     } catch (error) {
       console.error('Notion save error:', error);
-      alert(`❌ Notion Save failed: ${error instanceof ApiError ? error.message : String(error)}`);
+      const errorMessage = error instanceof ApiError ? error.message : String(error);
+      alert(`❌ Notion Save failed: ${errorMessage}\n\nMake sure:\n1. Notion is connected\n2. A database is selected\n3. The database is shared with your integration`);
     }
   };
 
@@ -108,9 +102,6 @@ const ApiDemo: React.FC = () => {
         </button>
         <button onClick={demoResearch} className="btn-primary">
           Test Research
-        </button>
-        <button onClick={demoNextSteps} className="btn-primary">
-          Test Next Steps
         </button>
         <button onClick={demoNotionSave} className="btn-primary">
           Test Notion Save

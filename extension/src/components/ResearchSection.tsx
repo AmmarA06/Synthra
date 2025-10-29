@@ -109,7 +109,7 @@ const ResearchSection: React.FC<ResearchSectionProps> = ({
             <textarea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="What would you like to research across your open tabs? e.g., 'Compare pricing models', 'Find common themes', 'Summarize key differences'"
+              placeholder=""
               className="textarea-field h-20"
             />
           </div>

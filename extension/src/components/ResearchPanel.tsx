@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, ExternalLink, Plus, X, ArrowRight, CheckCircle, AlertCircle, ChevronDown, ChevronRight, Maximize2 } from 'lucide-react';
 import { UrlResearchResponse, PageAnalysis } from '@shared/types';
 import { api, ApiError } from '../services/api';
@@ -23,31 +23,7 @@ const ResearchPanel: React.FC<ResearchPanelProps> = ({ onResearchComplete }) => 
     individual: false
   });
 
-  // Auto-populate with open tabs
-  useEffect(() => {
-    loadOpenTabs();
-  }, []);
 
-  const loadOpenTabs = async () => {
-    try {
-      const tabs = await chrome.tabs.query({});
-      const validTabs = tabs
-        .filter(tab => 
-          tab.url && 
-          !tab.url.startsWith('chrome://') && 
-          !tab.url.startsWith('chrome-extension://') &&
-          !tab.url.startsWith('moz-extension://')
-        )
-        .slice(0, 5) // Limit to first 5 tabs
-        .map(tab => tab.url!);
-      
-      if (validTabs.length > 0) {
-        setUrls(validTabs.concat([''])); // Add empty field for new URLs
-      }
-    } catch (error) {
-      console.error('Failed to load tabs:', error);
-    }
-  };
 
   const addUrlField = () => {
     setUrls([...urls, '']);
@@ -111,29 +87,23 @@ const ResearchPanel: React.FC<ResearchPanelProps> = ({ onResearchComplete }) => 
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Research Query (Optional)
+            Research Query 
           </label>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g., 'Compare pricing models', 'Find key differences'"
+            placeholder=""
             className="input-field"
           />
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
-              URLs to Compare ({urls.filter(url => url.trim()).length})
-            </label>
-            <button
-              onClick={loadOpenTabs}
-              className="text-xs text-synthra-600 hover:text-synthra-700"
-            >
-              Load Open Tabs
-            </button>
-          </div>
+                     <div className="flex items-center justify-between mb-2">
+             <label className="block text-sm font-medium text-gray-700">
+               URLs to Compare ({urls.filter(url => url.trim()).length})
+             </label>
+           </div>
           
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {urls.map((url, index) => (
@@ -330,12 +300,12 @@ const ResearchPanel: React.FC<ResearchPanelProps> = ({ onResearchComplete }) => 
 const PageCard: React.FC<{ page: PageAnalysis }> = ({ page }) => {
   if (page.error) {
     return (
-      <div className="card border-red-200">
+      <div className="card border-gray-200 bg-gray-50">
         <div className="flex items-center space-x-2 mb-2">
-          <AlertCircle className="w-4 h-4 text-red-500" />
-          <h4 className="text-sm font-medium text-red-700">{page.title}</h4>
+          <AlertCircle className="w-4 h-4 text-gray-500" />
+          <h4 className="text-sm font-medium text-gray-700">{page.title}</h4>
         </div>
-        <p className="text-sm text-red-600">{page.error}</p>
+        <p className="text-sm text-gray-600">Content could not be analyzed from this page.</p>
       </div>
     );
   }

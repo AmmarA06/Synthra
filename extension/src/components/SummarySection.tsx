@@ -15,35 +15,9 @@ const SummarySection: React.FC<SummarySectionProps> = ({
   onSummarize,
   isLoading
 }) => {
-  const formatUrl = (url: string) => {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.hostname + urlObj.pathname;
-    } catch {
-      return url;
-    }
-  };
 
   return (
     <div className="p-4 space-y-4">
-      {/* Current Tab Info */}
-      {currentTab && (
-        <div className="card">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0 mt-1">
-              <ExternalLink className="w-4 h-4 text-gray-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-medium text-gray-900 truncate">
-                {currentTab.title}
-              </h3>
-              <p className="text-xs text-gray-500 truncate">
-                {formatUrl(currentTab.url)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Generate Summary Button */}
       <button
