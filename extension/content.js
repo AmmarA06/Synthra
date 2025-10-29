@@ -1,14 +1,9 @@
-// Synthra Content Script
-
 console.log('Synthra content script loaded');
 
-// Highlight management
 let activeHighlights = [];
 let highlightIndex = 0;
 
-// Initialize content script
 function initialize() {
-  // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('Content script received message:', message);
     
@@ -43,12 +38,10 @@ function initialize() {
     }
   });
   
-  // Listen for text selection
   document.addEventListener('mouseup', handleTextSelection);
   document.addEventListener('keyup', handleTextSelection);
 }
 
-// Get page content
 function getPageContent() {
   return {
     title: document.title,
@@ -59,7 +52,6 @@ function getPageContent() {
   };
 }
 
-// Get just the page title for testing
 function getPageTitle() {
   return {
     title: document.title,
@@ -68,7 +60,6 @@ function getPageTitle() {
   };
 }
 
-// Get currently selected text
 function getSelectedText() {
   const selection = window.getSelection();
   const selectedText = selection.toString().trim();
@@ -92,7 +83,6 @@ function getSelectedText() {
   return null;
 }
 
-// Get context around selected text
 function getTextContext(range, contextLength) {
   const container = range.commonAncestorContainer;
   const fullText = container.textContent || '';
@@ -109,12 +99,10 @@ function getTextContext(range, contextLength) {
   };
 }
 
-// Handle text selection events
 function handleTextSelection() {
   const selectedText = getSelectedText();
   
   if (selectedText && selectedText.text.length > 3) {
-    // Notify background script about text selection
     chrome.runtime.sendMessage({
       type: 'TEXT_SELECTED',
       data: selectedText
@@ -124,7 +112,6 @@ function handleTextSelection() {
   }
 }
 
-// Highlight terms on page
 function highlightTermsOnPage(terms) {
   clearHighlights();
   
@@ -134,14 +121,12 @@ function highlightTermsOnPage(terms) {
   });
 }
 
-// Highlight a single term
 function highlightTerm(termText, explanation = '') {
   const walker = document.createTreeWalker(
     document.body,
     NodeFilter.SHOW_TEXT,
     {
       acceptNode: function(node) {
-        // Skip script and style elements
         const parent = node.parentElement;
         if (parent && (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE')) {
           return NodeFilter.FILTER_REJECT;
@@ -176,7 +161,6 @@ function highlightTerm(termText, explanation = '') {
     }
   });
   
-  // Add click listeners to highlights
   document.querySelectorAll('.synthra-highlight').forEach(highlight => {
     highlight.addEventListener('click', (e) => {
       e.preventDefault();
@@ -185,18 +169,15 @@ function highlightTerm(termText, explanation = '') {
   });
 }
 
-// Show tooltip for highlighted term
 function showHighlightTooltip(element) {
   const term = element.getAttribute('data-term');
   const explanation = element.getAttribute('data-explanation');
   
   if (explanation) {
-    // Remove existing tooltips
     document.querySelectorAll('.synthra-tooltip').forEach(tooltip => {
       tooltip.remove();
     });
     
-    // Create new tooltip
     const tooltip = document.createElement('div');
     tooltip.className = 'synthra-tooltip';
     tooltip.innerHTML = `
@@ -207,7 +188,6 @@ function showHighlightTooltip(element) {
       </div>
     `;
     
-    // Position tooltip
     const rect = element.getBoundingClientRect();
     tooltip.style.cssText = `
       position: fixed;
@@ -226,12 +206,10 @@ function showHighlightTooltip(element) {
     
     document.body.appendChild(tooltip);
     
-    // Add close listener
     tooltip.querySelector('.synthra-tooltip-close').addEventListener('click', () => {
       tooltip.remove();
     });
     
-    // Auto-remove after 5 seconds
     setTimeout(() => {
       if (tooltip.parentNode) {
         tooltip.remove();
@@ -240,7 +218,6 @@ function showHighlightTooltip(element) {
   }
 }
 
-// Clear all highlights
 function clearHighlights() {
   document.querySelectorAll('.synthra-highlight').forEach(highlight => {
     const parent = highlight.parentNode;
@@ -248,7 +225,6 @@ function clearHighlights() {
     parent.normalize();
   });
   
-  // Remove tooltips
   document.querySelectorAll('.synthra-tooltip').forEach(tooltip => {
     tooltip.remove();
   });
@@ -257,7 +233,6 @@ function clearHighlights() {
   highlightIndex = 0;
 }
 
-// Utility functions
 function escapeRegex(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -268,7 +243,6 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Add CSS for highlights and tooltips
 function addStyles() {
   if (document.getElementById('synthra-styles')) return;
   
@@ -317,7 +291,6 @@ function addStyles() {
   document.head.appendChild(style);
 }
 
-// Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     addStyles();

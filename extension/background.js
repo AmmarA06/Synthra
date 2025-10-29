@@ -1,20 +1,14 @@
-// Synthra Background Service Worker (Manifest V3)
-
-// API Configuration
 const API_BASE_URL = 'http://localhost:8000';
 
-// Install and startup
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Synthra extension installed');
   
-  // Initialize storage with default settings
   chrome.storage.sync.set({
     apiBaseUrl: API_BASE_URL,
     notionEnabled: false
   });
 });
 
-// Handle extension icon click - open side panel
 chrome.action.onClicked.addListener(async (tab) => {
   try {
     await chrome.sidePanel.open({ tabId: tab.id });
@@ -23,14 +17,13 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
-// Message handling from content script and sidebar
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Background received message:', message);
   
   switch (message.type) {
     case 'GET_TAB_CONTENT':
       handleGetTabContent(message, sender, sendResponse);
-      return true; // Keep message channel open for async response
+      return true;
       
     case 'SUMMARIZE_CONTENT':
       handleSummarizeContent(message, sendResponse);
@@ -61,12 +54,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Get current tab content
 async function handleGetTabContent(message, sender, sendResponse) {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
-    // Inject content script if not already injected
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -90,7 +81,6 @@ async function handleGetTabContent(message, sender, sendResponse) {
   }
 }
 
-// API call helper
 async function makeAPICall(endpoint, data) {
   try {
     const settings = await chrome.storage.sync.get(['apiBaseUrl']);
@@ -115,7 +105,6 @@ async function makeAPICall(endpoint, data) {
   }
 }
 
-// Handle summarize content
 async function handleSummarizeContent(message, sendResponse) {
   try {
     const result = await makeAPICall('/summarize', {
@@ -130,7 +119,6 @@ async function handleSummarizeContent(message, sendResponse) {
   }
 }
 
-// Handle highlight terms
 async function handleHighlightTerms(message, sendResponse) {
   try {
     const result = await makeAPICall('/highlight', {
@@ -145,10 +133,8 @@ async function handleHighlightTerms(message, sendResponse) {
   }
 }
 
-// Handle multi-tab research
 async function handleMultiTabResearch(message, sendResponse) {
   try {
-    // Get content from all specified tabs
     const tabs = await chrome.tabs.query({});
     const tabContents = [];
     
@@ -166,7 +152,6 @@ async function handleMultiTabResearch(message, sendResponse) {
           });
           tabContents.push(results[0].result);
         } catch (scriptError) {
-          // Skip tabs that can't be accessed (chrome:// URLs, etc.)
           continue;
         }
       }
@@ -188,7 +173,6 @@ async function handleMultiTabResearch(message, sendResponse) {
   }
 }
 
-// Handle suggest next steps
 async function handleSuggestNextSteps(message, sendResponse) {
   try {
     const result = await makeAPICall('/suggest-next-steps', {
@@ -203,7 +187,6 @@ async function handleSuggestNextSteps(message, sendResponse) {
   }
 }
 
-// Handle save to Notion
 async function handleSaveToNotion(message, sendResponse) {
   try {
     const result = await makeAPICall('/notion/save', {
@@ -219,13 +202,10 @@ async function handleSaveToNotion(message, sendResponse) {
   }
 }
 
-// Handle test echo - get title from current tab and send to backend
 async function handleTestEcho(message, sendResponse) {
   try {
-    // Get the current active tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
-    // Get title from content script
     try {
       const titleResponse = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -239,7 +219,6 @@ async function handleTestEcho(message, sendResponse) {
       
       const titleData = titleResponse[0].result;
       
-      // Send to backend echo endpoint
       const result = await makeAPICall('/echo', {
         title: titleData.title,
         url: titleData.url,

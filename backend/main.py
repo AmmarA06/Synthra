@@ -16,7 +16,6 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import uvicorn
 
-# Import our modules
 from services.ai_service import AIService
 from services.notion_service import NotionService
 from services.web_scraper import WebScraperService
@@ -30,17 +29,13 @@ from shared.types import (
     APIError
 )
 
-# Load environment variables
 load_dotenv()
-
-# Configure logging
 logging.basicConfig(
     level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO')),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Global services
 ai_service: Optional[AIService] = None
 notion_service: Optional[NotionService] = None
 web_scraper: Optional[WebScraperService] = None
@@ -50,10 +45,8 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     global ai_service, notion_service, web_scraper
     
-    # Startup
     logger.info("Starting Synthra backend...")
     
-    # Initialize AI service
     gemini_api_key = os.getenv('GEMINI_API_KEY')
     if not gemini_api_key:
         logger.error("GEMINI_API_KEY not found in environment variables")
@@ -62,25 +55,20 @@ async def lifespan(app: FastAPI):
     ai_service = AIService(api_key=gemini_api_key)
     logger.info("AI service initialized")
     
-    # Initialize web scraper service
     web_scraper = WebScraperService()
     logger.info("Web scraper service initialized")
     
-    # Initialize Notion service (optional)
     notion_token = os.getenv('NOTION_TOKEN')
     if notion_token:
         notion_service = NotionService(token=notion_token)
         logger.info("Notion service initialized")
     else:
         notion_service = None
-        # Note: Users input Notion token directly in extension settings
     
     yield
     
-    # Shutdown
     logger.info("Shutting down Synthra backend...")
 
-# Create FastAPI app
 app = FastAPI(
     title="Synthra API",
     description="AI-powered browser agent backend",
@@ -88,7 +76,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
 allowed_origins = os.getenv('ALLOWED_ORIGINS', 'chrome-extension://*').split(',')
 app.add_middleware(
     CORSMiddleware,
@@ -98,13 +85,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Dependency to get AI service
 def get_ai_service() -> AIService:
     if ai_service is None:
         raise HTTPException(status_code=500, detail="AI service not initialized")
     return ai_service
 
-# Dependency to get Notion service
 def get_notion_service() -> NotionService:
     if notion_service is None:
         raise HTTPException(status_code=500, detail="Notion service not available")
@@ -145,10 +130,8 @@ async def summarize_content(
     try:
         logger.info(f"Summarizing content from: {request.url}")
         
-        # Use enhanced content parsing for better quality (re-fetch with Content Core)
-        enhanced_content = request.content  # Default to browser content
+        enhanced_content = request.content
         try:
-            # Skip enhancement for extension URLs and invalid URLs
             if request.url and not request.url.startswith(('chrome-extension://', 'moz-extension://', 'about:', 'data:')):
                 parsed_result = await web_scraper.fetch_page_content(request.url, use_enhanced_parser=True)
                 if parsed_result.get('success') and len(parsed_result.get('content', '')) > len(request.content):
@@ -157,19 +140,16 @@ async def summarize_content(
         except Exception as e:
             logger.warning(f"Enhanced parsing failed, using browser content: {e}")
         
-        # Generate summary with enhanced content and vector context
         summary = await ai_service.summarize_content(
             content=enhanced_content,
             title=request.title,
             url=request.url
         )
         
-        # Add images from enhanced parsing if available
         if request.url and not request.url.startswith(('chrome-extension://', 'moz-extension://', 'about:', 'data:')):
             try:
                 parsed_result = await web_scraper.fetch_page_content(request.url, use_enhanced_parser=True)
                 if parsed_result.get('images'):
-                    # Add images to summary object
                     summary.images = parsed_result['images']
                     logger.info(f"Added {len(parsed_result['images'])} images to summary")
             except Exception as e:
@@ -195,10 +175,8 @@ async def highlight_terms(
     try:
         logger.info(f"Highlighting terms for: {request.url}")
         
-        # Use enhanced content parsing for better quality (re-fetch with Content Core)
-        enhanced_content = request.content  # Default to browser content
+        enhanced_content = request.content
         try:
-            # Skip enhancement for extension URLs and invalid URLs
             if request.url and not request.url.startswith(('chrome-extension://', 'moz-extension://', 'about:', 'data:')):
                 parsed_result = await web_scraper.fetch_page_content(request.url, use_enhanced_parser=True)
                 if parsed_result.get('success') and len(parsed_result.get('content', '')) > len(request.content):
@@ -232,7 +210,6 @@ async def multi_tab_research(
     """Perform enhanced research across multiple tabs with vector search"""
     try:
         logger.info(f"Performing enhanced multi-tab research: {request.query}")
-        # Use enhanced version by default since vector service is integrated
         research = await ai_service.enhanced_multi_tab_research(
             tabs=request.tabs,
             query=request.query
@@ -241,7 +218,6 @@ async def multi_tab_research(
     
     except Exception as e:
         logger.error(f"Error in enhanced multi-tab research, falling back to basic: {str(e)}")
-        # Fall back to basic research if enhanced fails
         try:
             research = await ai_service.multi_tab_research(
                 tabs=request.tabs,
@@ -358,15 +334,14 @@ async def save_to_notion(
     request: dict,
     ai_service: AIService = Depends(get_ai_service)
 ):
-    """Save content to Notion with enhanced context, deduplication, and rollback on error"""
-    created_page_id = None  # Track created page for rollback
+    """Save content to Notion with enhanced context and error rollback"""
+    created_page_id = None
 
     try:
         logger.info(f"Saving {request.get('type')} to Notion")
         logger.debug(f"Content type: {type(request.get('content'))}")
         logger.debug(f"Content preview: {str(request.get('content'))[:200]}...")
 
-        # Handle both camelCase and snake_case field names
         notion_token = request.get('notion_token') or request.get('notionToken')
         database_id = request.get('database_id') or request.get('databaseId')
         content = request.get('content')
@@ -380,12 +355,9 @@ async def save_to_notion(
                 error="Notion token not provided. Please configure Notion integration in settings."
             )
 
-        # Only re-scrape if we don't already have good content
-        # Re-scrape if: content is very short (<500 chars) or appears to be just a summary
         should_rescrape = False
         if url and not url.startswith(('chrome-extension://', 'moz-extension://', 'about:', 'data:')):
             content_str = str(content) if content else ""
-            # Re-scrape if content is too short or missing
             if len(content_str) < 500:
                 should_rescrape = True
                 logger.info(f"Content too short ({len(content_str)} chars), will re-scrape")
@@ -395,7 +367,6 @@ async def save_to_notion(
                 logger.info(f"Re-scraping {url} for better content")
                 parsed_result = await web_scraper.fetch_page_content(url, use_enhanced_parser=True)
 
-                # Check if scraping failed (bot detection, etc.)
                 if not parsed_result.get('success'):
                     error_msg = parsed_result.get('error', 'Failed to scrape content')
                     logger.error(f"Scraping failed: {error_msg}")
@@ -405,9 +376,8 @@ async def save_to_notion(
                     )
 
                 if parsed_result.get('content'):
-                    # Use fresh scraped content instead of summary
                     content = parsed_result['content']
-                    content_type = 'content'  # Force to use CleanContentParser
+                    content_type = 'content'
                     logger.info(f"Using fresh content: {len(content)} chars")
                 else:
                     logger.warning("No content extracted from page")
@@ -416,7 +386,6 @@ async def save_to_notion(
                         error="No readable content found on this page. The page may be empty or protected."
                     )
             except ValueError as ve:
-                # Bot detection or access blocked
                 logger.error(f"Access blocked: {str(ve)}")
                 return NotionSaveResponse(
                     success=False,
@@ -429,12 +398,9 @@ async def save_to_notion(
                     error=f"Failed to fetch content from website: {str(e)}"
                 )
         
-        # Use content as-is without deduplication checks
         enhanced_content = content
-        
         notion_service = NotionService(token=notion_token)
 
-        # Save enhanced content with rollback on error
         try:
             result = await notion_service.save_content(
                 content=enhanced_content,
@@ -443,7 +409,7 @@ async def save_to_notion(
                 url=url,
                 database_id=database_id
             )
-            created_page_id = result.get('page_id')  # Track for potential rollback
+            created_page_id = result.get('page_id')
 
             return NotionSaveResponse(
                 page_id=result.get('page_id'),
@@ -452,14 +418,12 @@ async def save_to_notion(
             )
 
         except ValueError as ve:
-            # Content formatting error or bot detection - don't create page
             logger.error(f"Content validation failed: {str(ve)}")
             return NotionSaveResponse(
                 success=False,
                 error=f"Content Error: {str(ve)}"
             )
         except Exception as save_error:
-            # If page was created but there was an error after, try to delete it
             if created_page_id:
                 try:
                     logger.warning(f"Attempting to delete incomplete page {created_page_id} due to error")
@@ -471,7 +435,6 @@ async def save_to_notion(
             error_message = str(save_error)
             logger.error(f"Error saving to Notion: {error_message}")
 
-            # Provide user-friendly error messages
             if "validation" in error_message.lower():
                 error_message = f"Content format invalid for Notion: {error_message}"
             elif "unauthorized" in error_message.lower():
@@ -485,10 +448,8 @@ async def save_to_notion(
             )
 
     except Exception as e:
-        # Catch-all for unexpected errors
         logger.error(f"Unexpected error in save_to_notion: {str(e)}")
 
-        # If a page was somehow created, try to clean it up
         if created_page_id:
             try:
                 notion_service = NotionService(token=notion_token)
@@ -511,7 +472,6 @@ async def url_research(
     try:
         logger.info(f"Starting enhanced URL research for {len(request.urls)} URLs")
         
-        # Use enhanced content parsing for better quality
         page_contents = []
         for url in request.urls:
             try:
@@ -526,11 +486,9 @@ async def url_research(
                     'error': str(e)
                 })
         
-        # Analyze each page individually
         page_analyses = []
         for page_content in page_contents:
             if page_content.get('error'):
-                # Handle failed fetches
                 page_analyses.append(PageAnalysis(
                     title=page_content.get('title', 'Error'),
                     url=page_content['url'],
@@ -559,7 +517,6 @@ async def url_research(
                 error=analysis.get('error')
             ))
         
-        # Generate comparative analysis
         comparison = await ai_service.compare_pages(
             [page.__dict__ for page in page_analyses if not page.error],
             request.query or ""
@@ -586,7 +543,6 @@ async def url_research(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    """Global exception handler"""
     logger.error(f"Unhandled exception: {str(exc)}")
     return JSONResponse(
         status_code=500,
