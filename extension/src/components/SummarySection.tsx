@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, ExternalLink, Clock } from 'lucide-react';
+import { Brain, ExternalLink } from 'lucide-react';
 import { TabContent, Summary } from '@shared/types';
 
 interface SummarySectionProps {
@@ -35,12 +35,6 @@ const SummarySection: React.FC<SummarySectionProps> = ({
           <div className="flex items-center space-x-2 mb-3">
             <Brain className="w-4 h-4 text-synthra-600" />
             <h3 className="text-sm font-medium text-gray-900">Summary</h3>
-            {summary.timestamp && (
-              <div className="flex items-center space-x-1 text-xs text-gray-500 ml-auto">
-                <Clock className="w-3 h-3" />
-                <span>{new Date(summary.timestamp).toLocaleTimeString()}</span>
-              </div>
-            )}
           </div>
 
           {/* Key Points */}
