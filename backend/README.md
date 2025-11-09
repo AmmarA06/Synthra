@@ -6,11 +6,11 @@
    pip install -r requirements.txt
    ```
 
-2. **Configure environment variables**:
+2. **Configure environment variables (Optional for development)**:
 
    ```bash
    cp env.example .env
-   # Edit .env with your API keys
+   # Edit .env with your API keys (optional - can be configured in extension settings)
    ```
 
 3. **Start the development server**:
@@ -20,11 +20,13 @@
    uvicorn main:app --reload
    ```
 
-## Environment Variables
+## Environment Variables (Optional)
 
-Create a `.env` file with the following variables:
+For development convenience, you can create a `.env` file with the following variables. **Note:** The extension now allows users to configure their API key in the settings, making the `.env` file optional.
 
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-flash-latest
+GEMINI_API_KEY=your_gemini_api_key_here  # Optional - falls back to extension settings
+GEMINI_MODEL=gemini-flash-latest         # Optional - defaults to gemini-flash-latest
 ```
+
+**For production/Chrome Web Store:** Users configure their Gemini API key directly in the extension settings. No backend configuration needed!

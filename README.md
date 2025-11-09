@@ -25,26 +25,13 @@ Turn any webpage into beautiful, study-ready Notion pages with one click.
 npm run install:all
 ```
 
-### 2. Configure Backend
-
-Create `backend/.env`:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key
-```
-
-**Get Notion credentials:**
-
-1. [Create integration](https://www.notion.so/my-integrations) → Copy token
-2. Share database with integration → Copy database ID from URL
-
-### 3. Start Development
+### 2. Start Development
 
 ```bash
 npm run dev
 ```
 
-### 4. Load Extension
+### 3. Load Extension
 
 ```bash
 cd extension
@@ -57,19 +44,26 @@ npm run build
 
 ## Usage
 
+### Initial Setup
+
+1. Click Synthra icon in Chrome to open the side panel
+2. Go to **Settings** tab
+3. **Configure Gemini AI:**
+   - Get your API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+   - Paste it in the Gemini API Key field
+   - Click "Save" and test the connection
+4. **Configure Notion (Optional):**
+   - [Create integration](https://www.notion.so/my-integrations) → Copy token
+   - Paste token and connect your account
+   - Select a database to save content to
+
+### Using the Extension
+
 1. Browse to any webpage
-2. Click Synthra icon in Chrome to open the side panel
-3. **Summarize**: Get AI-powered summary with key points
-4. **Highlight**: Identify and explain key terms on the page
-5. **Research**: Compare multiple tabs or URLs
-6. **Save to Notion**: Export summaries and content to your Notion workspace
-
-### Notion Integration
-
-1. Click "Settings" in the extension
-2. Connect your Notion account
-3. Select a database to save to
-4. All summaries and research can be saved with one click
+2. **Summarize**: Get AI-powered summary with key points
+3. **Highlight**: Identify and explain key terms on the page
+4. **Research**: Compare multiple tabs or URLs
+5. **Save to Notion**: Export summaries and content to your Notion workspace (if configured)
 
 ## Development
 
@@ -80,3 +74,5 @@ cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```
+
+**Optional:** For development, you can create `backend/.env` with `GEMINI_API_KEY=your_key` to avoid configuring it in the extension each time. The extension will fall back to environment variables if no API key is configured in settings.
