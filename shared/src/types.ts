@@ -81,6 +81,7 @@ export interface SummarizeRequest {
   content: string;
   url: string;
   title: string;
+  geminiApiKey?: string;
 }
 
 export interface SummarizeResponse {
@@ -93,6 +94,7 @@ export interface HighlightRequest {
   content: string;
   url: string;
   context?: string;
+  geminiApiKey?: string;
 }
 
 export interface HighlightResponse {
@@ -104,6 +106,7 @@ export interface HighlightResponse {
 export interface MultiTabResearchRequest {
   tabs: TabContent[];
   query: string;
+  geminiApiKey?: string;
 }
 
 export interface MultiTabResearchResponse {
@@ -116,6 +119,7 @@ export interface MultiTabResearchResponse {
 export interface UrlResearchRequest {
   urls: string[];
   query?: string;
+  geminiApiKey?: string;
 }
 
 export interface PageAnalysis {
@@ -249,6 +253,7 @@ export interface ExtensionSettings {
   highlightEnabled: boolean;
   notionToken?: string;
   notionDatabaseId?: string;
+  geminiApiKey?: string;
 }
 
 // Error types

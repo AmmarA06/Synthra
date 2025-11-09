@@ -239,6 +239,7 @@ class ExtensionSettings:
     highlight_enabled: bool
     notion_token: Optional[str] = None
     notion_database_id: Optional[str] = None
+    gemini_api_key: Optional[str] = None
 
 @dataclass
 class APIError:

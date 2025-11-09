@@ -36,24 +36,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-ai_service: Optional[AIService] = None
 notion_service: Optional[NotionService] = None
 web_scraper: Optional[WebScraperService] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
-    global ai_service, notion_service, web_scraper
+    global notion_service, web_scraper
     
     logger.info("Starting Synthra backend...")
-    
-    gemini_api_key = os.getenv('GEMINI_API_KEY')
-    if not gemini_api_key:
-        logger.error("GEMINI_API_KEY not found in environment variables")
-        raise ValueError("GEMINI_API_KEY is required")
-
-    ai_service = AIService(api_key=gemini_api_key)
-    logger.info("AI service initialized")
     
     web_scraper = WebScraperService()
     logger.info("Web scraper service initialized")
@@ -85,10 +76,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_ai_service() -> AIService:
-    if ai_service is None:
-        raise HTTPException(status_code=500, detail="AI service not initialized")
-    return ai_service
+def get_ai_service_from_request(api_key: Optional[str]) -> AIService:
+    """Create AI service instance from request API key"""
+    if not api_key:
+        # Try environment variable as fallback for development
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            raise HTTPException(
+                status_code=400, 
+                detail="Gemini API key is required. Please provide it in the request or configure it in settings."
+            )
+    
+    try:
+        return AIService(api_key=api_key)
+    except Exception as e:
+        logger.error(f"Failed to initialize AI service: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid Gemini API key: {str(e)}")
 
 def get_notion_service() -> NotionService:
     if notion_service is None:
@@ -121,14 +124,44 @@ async def echo_test(request: dict):
         "success": True
     }
 
+@app.post("/test-gemini")
+async def test_gemini_connection(request: dict):
+    """Test Gemini API connection"""
+    try:
+        api_key = request.get('apiKey')
+        if not api_key:
+            return {"success": False, "error": "API key is required"}
+        
+        # Test the AI service initialization
+        ai_service = get_ai_service_from_request(api_key)
+        
+        # Try a simple test call
+        test_summary = await ai_service.summarize_content(
+            content="This is a test content to verify the Gemini API connection.",
+            title="Test",
+            url="test://connection"
+        )
+        
+        return {
+            "success": True,
+            "message": "Gemini API connection successful",
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        }
+    except Exception as e:
+        logger.error(f"Gemini connection test failed: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 @app.post("/summarize", response_model=SummarizeResponse)
-async def summarize_content(
-    request: SummarizeRequest,
-    ai_service: AIService = Depends(get_ai_service)
-):
+async def summarize_content(request: SummarizeRequest):
     """Summarize web page content with enhanced parsing"""
     try:
         logger.info(f"Summarizing content from: {request.url}")
+        
+        # Get AI service with API key from request
+        ai_service = get_ai_service_from_request(request.gemini_api_key)
         
         enhanced_content = request.content
         try:
@@ -167,13 +200,13 @@ async def summarize_content(
         )
 
 @app.post("/highlight", response_model=HighlightResponse)
-async def highlight_terms(
-    request: HighlightRequest,
-    ai_service: AIService = Depends(get_ai_service)
-):
+async def highlight_terms(request: HighlightRequest):
     """Identify and explain key terms in content with enhanced parsing"""
     try:
         logger.info(f"Highlighting terms for: {request.url}")
+        
+        # Get AI service with API key from request
+        ai_service = get_ai_service_from_request(request.gemini_api_key)
         
         enhanced_content = request.content
         try:
@@ -203,13 +236,14 @@ async def highlight_terms(
         )
 
 @app.post("/multi-tab-research", response_model=MultiTabResearchResponse)
-async def multi_tab_research(
-    request: MultiTabResearchRequest,
-    ai_service: AIService = Depends(get_ai_service)
-):
+async def multi_tab_research(request: MultiTabResearchRequest):
     """Perform enhanced research across multiple tabs with vector search"""
     try:
         logger.info(f"Performing enhanced multi-tab research: {request.query}")
+        
+        # Get AI service with API key from request
+        ai_service = get_ai_service_from_request(request.gemini_api_key)
+        
         research = await ai_service.enhanced_multi_tab_research(
             tabs=request.tabs,
             query=request.query
@@ -219,6 +253,8 @@ async def multi_tab_research(
     except Exception as e:
         logger.error(f"Error in enhanced multi-tab research, falling back to basic: {str(e)}")
         try:
+            # Get AI service with API key from request for fallback
+            ai_service = get_ai_service_from_request(request.gemini_api_key)
             research = await ai_service.multi_tab_research(
                 tabs=request.tabs,
                 query=request.query
@@ -233,13 +269,14 @@ async def multi_tab_research(
             )
 
 @app.post("/multi-tab-research-enhanced", response_model=MultiTabResearchResponse)
-async def enhanced_multi_tab_research(
-    request: MultiTabResearchRequest,
-    ai_service: AIService = Depends(get_ai_service)
-):
+async def enhanced_multi_tab_research(request: MultiTabResearchRequest):
     """Perform enhanced research across multiple tabs using vector similarity"""
     try:
         logger.info(f"Performing enhanced multi-tab research: {request.query}")
+        
+        # Get AI service with API key from request
+        ai_service = get_ai_service_from_request(request.gemini_api_key)
+        
         research = await ai_service.enhanced_multi_tab_research(
             tabs=request.tabs,
             query=request.query
@@ -464,13 +501,13 @@ async def save_to_notion(
         )
 
 @app.post("/url-research", response_model=UrlResearchResponse)
-async def url_research(
-    request: UrlResearchRequest,
-    ai_service: AIService = Depends(get_ai_service),
-):
+async def url_research(request: UrlResearchRequest):
     """Fetch and analyze multiple URLs for comparison with enhanced parsing"""
     try:
         logger.info(f"Starting enhanced URL research for {len(request.urls)} URLs")
+        
+        # Get AI service with API key from request
+        ai_service = get_ai_service_from_request(request.gemini_api_key)
         
         page_contents = []
         for url in request.urls:

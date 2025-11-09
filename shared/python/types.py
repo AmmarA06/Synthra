@@ -77,33 +77,6 @@ class NextStep:
     resources: List[NextStepResource] = field(default_factory=list)
     tags: Optional[List[str]] = None
 
-# Vector Search and Similarity types
-@dataclass
-class VectorDocument:
-    id: int
-    title: str
-    url: str
-    content: str
-    metadata: Dict[str, Any]
-    added_at: str
-    similarity_score: Optional[float] = None
-    rank: Optional[int] = None
-
-@dataclass
-class SimilarContent:
-    title: str
-    url: str
-    content: str
-    similarity_score: float
-    rank: int
-
-@dataclass
-class ContentCluster:
-    clusters: List[List[int]]
-    labels: List[int]
-    centroids: List[List[float]]
-    n_clusters: int
-
 # Request/Response types for API
 @dataclass
 class SummarizeRequest:
@@ -149,62 +122,6 @@ class SuggestNextStepsRequest:
 @dataclass
 class SuggestNextStepsResponse:
     steps: List[NextStep]
-    success: bool
-    error: Optional[str] = None
-
-# Vector Search API types
-@dataclass
-class VectorSearchRequest:
-    query: str
-    k: Optional[int] = None
-    threshold: Optional[float] = None
-
-@dataclass
-class VectorSearchResponse:
-    results: List[VectorDocument]
-    success: bool
-    error: Optional[str] = None
-
-@dataclass
-class AddDocumentsRequest:
-    documents: List[Dict[str, Any]]
-
-@dataclass
-class AddDocumentsResponse:
-    document_ids: List[int]
-    success: bool
-    error: Optional[str] = None
-
-@dataclass
-class FindSimilarContentRequest:
-    content: str
-    tab_contents: List[TabContent]
-    k: Optional[int] = None
-
-@dataclass
-class FindSimilarContentResponse:
-    similar_contents: List[SimilarContent]
-    success: bool
-    error: Optional[str] = None
-
-@dataclass
-class ContentDiversityRequest:
-    contents: List[str]
-
-@dataclass
-class ContentDiversityResponse:
-    diversity_score: float
-    success: bool
-    error: Optional[str] = None
-
-@dataclass
-class ClusterContentRequest:
-    contents: List[str]
-    n_clusters: Optional[int] = None
-
-@dataclass
-class ClusterContentResponse:
-    clusters: ContentCluster
     success: bool
     error: Optional[str] = None
 

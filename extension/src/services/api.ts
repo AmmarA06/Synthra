@@ -60,6 +60,19 @@ export class ApiService {
   }
 
   /**
+   * Get Gemini API key from Chrome storage
+   */
+  private async getGeminiApiKey(): Promise<string | undefined> {
+    try {
+      const result = await chrome.storage.sync.get(['geminiApiKey']);
+      return result.geminiApiKey;
+    } catch (error) {
+      console.error('Failed to get Gemini API key from storage:', error);
+      return undefined;
+    }
+  }
+
+  /**
    * Make HTTP request with proper error handling
    */
   private async makeRequest<T>(
@@ -131,10 +144,13 @@ export class ApiService {
    * Summarize content
    */
   async summarize(content: string, title: string, url: string): Promise<Summary> {
+    const geminiApiKey = await this.getGeminiApiKey();
+    
     const request: SummarizeRequest = {
       content,
       title,
-      url
+      url,
+      geminiApiKey
     };
 
     const response = await this.makeRequest<SummarizeResponse>('/summarize', request);
@@ -150,10 +166,13 @@ export class ApiService {
    * Highlight key terms in text
    */
   async highlight(content: string, context?: string): Promise<Highlight[]> {
+    const geminiApiKey = await this.getGeminiApiKey();
+    
     const request: HighlightRequest = {
       content,
       url: window.location?.href || '',
-      context
+      context,
+      geminiApiKey
     };
 
     const response = await this.makeRequest<HighlightResponse>('/highlight', request);
@@ -169,9 +188,12 @@ export class ApiService {
    * Perform multi-tab research
    */
   async research(query: string, tabs: TabContent[]): Promise<Research> {
+    const geminiApiKey = await this.getGeminiApiKey();
+    
     const request: MultiTabResearchRequest = {
       query,
-      tabs
+      tabs,
+      geminiApiKey
     };
 
     const response = await this.makeRequest<MultiTabResearchResponse>('/multi-tab-research', request);
@@ -255,9 +277,12 @@ export class ApiService {
    * Research multiple URLs with comparison analysis
    */
   async urlResearch(urls: string[], query?: string): Promise<UrlResearchResponse> {
+    const geminiApiKey = await this.getGeminiApiKey();
+    
     const request: UrlResearchRequest = {
       urls,
-      query
+      query,
+      geminiApiKey
     };
 
     const response = await this.makeRequest<UrlResearchResponse>('/url-research', request);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Settings } from 'lucide-react';
 import NotionIntegration from './NotionIntegration';
+import GeminiIntegration from './GeminiIntegration';
 
 const SettingsSection: React.FC = () => {
 
@@ -12,10 +13,11 @@ const SettingsSection: React.FC = () => {
         <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
       </div>
 
+      {/* Gemini AI Integration */}
+      <GeminiIntegration />
+
       {/* Notion Integration */}
       <NotionIntegration />
-
-
 
       {/* Version Info */}
       <div className="border-t pt-4">
