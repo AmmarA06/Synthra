@@ -83,6 +83,7 @@ class SummarizeRequest:
     content: str
     url: str
     title: str
+    gemini_api_key: Optional[str] = None
 
 @dataclass
 class SummarizeResponse:
@@ -95,6 +96,7 @@ class HighlightRequest:
     content: str
     url: str
     context: Optional[str] = None
+    gemini_api_key: Optional[str] = None
 
 @dataclass
 class HighlightResponse:
@@ -106,10 +108,34 @@ class HighlightResponse:
 class MultiTabResearchRequest:
     tabs: List[TabContent]
     query: str
+    gemini_api_key: Optional[str] = None
 
 @dataclass
 class MultiTabResearchResponse:
     research: Research
+    success: bool
+    error: Optional[str] = None
+
+@dataclass
+class UrlResearchRequest:
+    urls: List[str]
+    query: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+
+@dataclass
+class PageAnalysis:
+    title: str
+    url: str
+    key_points: List[str]
+    pros: List[str]
+    cons: List[str]
+    summary: str
+    error: Optional[str] = None
+
+@dataclass
+class UrlResearchResponse:
+    pages: List[PageAnalysis]
+    comparison: Dict[str, Any]
     success: bool
     error: Optional[str] = None
 
