@@ -108,7 +108,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "ai_service": ai_service is not None,
+        "ai_service": "configured_per_request",
         "notion_service": notion_service is not None
     }
 
@@ -367,10 +367,7 @@ async def get_notion_databases(request: dict):
         }
 
 @app.post("/notion/save", response_model=NotionSaveResponse)
-async def save_to_notion(
-    request: dict,
-    ai_service: AIService = Depends(get_ai_service)
-):
+async def save_to_notion(request: dict):
     """Save content to Notion with enhanced context and error rollback"""
     created_page_id = None
 
