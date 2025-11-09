@@ -11,8 +11,6 @@
     "sidePanel"
   ],
   "host_permissions": [
-    "http://localhost:8000/*",
-    "https://api.openai.com/*",
     "https://api.notion.com/*",
     "<all_urls>"
   ],
