@@ -2,6 +2,8 @@
 
 Turn any webpage into beautiful, study-ready Notion pages with one click.
 
+https://github.com/user-attachments/assets/5b8aaa64-3fa8-46a5-8e1d-cbabffea1779
+
 ### Features
 
 - Extracts clean content using enhanced parsing (no ads or clutter)
